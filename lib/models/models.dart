@@ -42,3 +42,31 @@ class OfferSdpData {
     );
   }
 }
+
+class VideoToggleData {
+  String? userId;
+  bool? videoEnabled;
+
+  VideoToggleData({this.userId, this.videoEnabled});
+
+  factory VideoToggleData.fromJson(dynamic json) {
+    return VideoToggleData(
+      userId: json['userId'],
+      videoEnabled: json['videoEnabled'],
+    );
+  }
+}
+
+class AudioToggleData {
+  String? userId;
+  bool? audioEnabled;
+
+  AudioToggleData({this.userId, this.audioEnabled});
+
+  factory AudioToggleData.fromJson(dynamic json) {
+    return AudioToggleData(
+      userId: json['userId'],
+      audioEnabled: json['audioEnabled'],
+    );
+  }
+}

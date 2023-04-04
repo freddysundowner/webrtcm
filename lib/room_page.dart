@@ -98,7 +98,6 @@ class _MyHomePageState extends State<RoomPage> {
     var decodedData = jsonDecode(data);
 
     MessagePayload messagePayload = MessagePayload.fromJson(decodedData);
-    print("messages received ${decodedData["type"]}");
     if (messagePayload.type == "user-joined") {
       _createOffer();
     }
@@ -109,9 +108,26 @@ class _MyHomePageState extends State<RoomPage> {
       receivedAnserSdp(OfferSdpData.fromJson(messagePayload.data));
     }
     if (messagePayload.type == "icecandidate") {
-      print("receivec ice ${messagePayload.data}");
       setCandidate(IceCandidateData.fromJson(messagePayload.data));
     }
+    if (messagePayload.type == 'video-toggle') {
+      listenVideoToggle(VideoToggleData.fromJson(messagePayload.data));
+    }
+    if (messagePayload.type == 'audio-toggle') {
+      listenAudioToggle(AudioToggleData.fromJson(messagePayload.data));
+    }
+  }
+
+  void listenVideoToggle(VideoToggleData data) {
+    // final connection = getConnection(data.userId!);
+    // _peerConnection.toggleVideo(data.videoEnabled!);
+    // socket?.emit('connection-setting-changed');
+  }
+
+  void listenAudioToggle(AudioToggleData data) {
+    // final connection = getConnection(data.userId!);
+    // connection.toggleAudio(data.audioEnabled!);
+    // socket?.emit('connection-setting-changed');
   }
 
   Future<void> setCandidate(IceCandidateData candidate) async {
@@ -119,18 +135,12 @@ class _MyHomePageState extends State<RoomPage> {
   }
 
   void receivedAnserSdp(OfferSdpData data) async {
-    print("receivedAnserSdp");
     if (_peerConnection != null) {
       await _peerConnection?.setRemoteDescription(data.sdp!);
-
-      print("awnding ice");
-      // socket!.emit(
-      //     "message", {"type": "icecandidate", "room": widget.id, "data": ice});
     }
   }
 
   void receivedOfferSdp(OfferSdpData data) async {
-    print("receivedOfferSdp");
     if (_peerConnection != null) {
       await _peerConnection?.setRemoteDescription(data.sdp!);
       await _createAnswer();
@@ -175,15 +185,10 @@ class _MyHomePageState extends State<RoomPage> {
     RTCPeerConnection pc =
         await createPeerConnection(configuration, offerSdpConstraints);
 
-    pc.addStream(stream!);
+    pc.addStream(stream);
 
     pc.onIceCandidate = (e) {
       if (e.candidate != null) {
-        // ice = {
-        //   'candidate': e.candidate,
-        //   'sdpMid': e.sdpMid,
-        //   'sdpMlineIndex': e.sdpMLineIndex
-        // };
         socket!.emit("message", {
           "type": "icecandidate",
           "data": {
@@ -193,21 +198,18 @@ class _MyHomePageState extends State<RoomPage> {
             'sdpMlineIndex': e.sdpMLineIndex
           }
         });
-        // setCandidate(IceCandidateData.fromJson({
-        //   'candidate': e.candidate,
-        //   'sdpMid': e.sdpMid,
-        //   'sdpMlineIndex': e.sdpMLineIndex
-        // }));
-        // print(json.encode({
-        //   'candidate': e.candidate,
-        //   'sdpMid': e.sdpMid,
-        //   'sdpMlineIndex': e.sdpMLineIndex
-        // }));
       }
     };
 
     pc.onIceConnectionState = (e) {
-      print(e);
+      RTCIceConnectionState connectionState = e;
+      if (connectionState.name == "RTCIceConnectionStateDisconnected") {
+        print("onIceConnectionState ${e.name}");
+
+        _remoteVideoRenderer.srcObject = null;
+
+        setState(() {});
+      }
     };
 
     pc.onAddStream = (stream) {
@@ -220,10 +222,10 @@ class _MyHomePageState extends State<RoomPage> {
   }
 
   void _createOffer() async {
+    await _getUserMedia();
+    _peerConnection = await createConnection(_localStream!);
     RTCSessionDescription description =
         await _peerConnection!.createOffer({'offerToReceiveVideo': 1});
-    var session = parse(description.sdp.toString());
-    print("sending offer-sdp");
     socket!.emit("message",
         {"type": "offer-sdp", "room": widget.id, "data": description.toMap()});
     _peerConnection!.setLocalDescription(description);
@@ -232,37 +234,11 @@ class _MyHomePageState extends State<RoomPage> {
   Future _createAnswer() async {
     RTCSessionDescription description =
         await _peerConnection!.createAnswer({'offerToReceiveVideo': 1});
-    print("sending answer-sdp");
     socket!.emit("message",
         {"type": "answer-sdp", "room": widget.id, "data": description.toMap()});
 
     _peerConnection!.setLocalDescription(description);
   }
-
-  // void _setRemoteDescription(String data) async {
-  //   String jsonString = data;
-  //   // print(data);
-  //   dynamic session = await jsonDecode('$jsonString');
-  //
-  //   // print("received ${session}");
-  //
-  //   String sdp = write(session["data"], null);
-  //
-  //   RTCSessionDescription description =
-  //       new RTCSessionDescription(sdp, _offer ? 'answer' : 'offer');
-  //   // print(description.toMap());
-  //
-  //   await _peerConnection!.setRemoteDescription(description);
-  // }
-
-  // void _addCandidate() async {
-  //   String jsonString = sdpController.text;
-  //   dynamic session = await jsonDecode('$jsonString');
-  //   print(session['candidate']);
-  //   dynamic candidate = new RTCIceCandidate(
-  //       session['candidate'], session['sdpMid'], session['sdpMlineIndex']);
-  //   await _peerConnection!.addCandidate(candidate);
-  // }
 
   @override
   Widget build(BuildContext context) {
